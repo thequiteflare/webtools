@@ -1,7 +1,12 @@
 # Webtools 🛠️
 
+[![Live App](https://img.shields.io/badge/Live_App-thewebtools.vercel.app-000000?style=for-the-badge&logo=vercel)](https://thewebtools.vercel.app/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+
 > **Fast, private, and 100% client-side web utilities.**
 > Process PDFs, resize images, generate QR codes, convert formats, and more—completely in your browser, with zero backend servers.
+>
+> 🌐 **Live URL**: [https://thewebtools.vercel.app/](https://thewebtools.vercel.app/)
 
 ---
 
