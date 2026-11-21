@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar container */}
       <aside
-        className={`fixed top-16 bottom-0 left-0 z-40 w-64 border-r border-border/80 bg-card/50 backdrop-blur-sm transition-transform duration-200 ease-in-out md:static md:translate-x-0 overflow-y-auto ${
+        className={`fixed top-16 bottom-0 left-0 z-40 w-64 border-r border-border/80 bg-card/95 md:bg-card/50 backdrop-blur-sm transition-transform duration-200 ease-in-out md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:z-30 md:transform-none md:shrink-0 overflow-y-auto ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
