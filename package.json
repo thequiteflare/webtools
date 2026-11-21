@@ -2,6 +2,11 @@
   "name": "webtools",
   "private": true,
   "version": "0.1.0",
+  "homepage": "https://github.com/thequiteflare/webtools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thequiteflare/webtools.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

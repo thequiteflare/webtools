@@ -29,7 +29,7 @@ const SAMPLE_DATA = {
   ],
   author: {
     name: 'Sanish',
-    github: 'https://github.com/sanish/webtools',
+    github: 'https://github.com/thequiteflare/webtools',
   },
   settings: {
     offlineFirst: true,
