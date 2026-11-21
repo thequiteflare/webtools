@@ -73,6 +73,75 @@ export function processImage(
 }
 
 /**
+ * Compress an image to fit under a target byte size using iterative binary search.
+ * Optimizes quality first, then proportionally downscales dimensions if needed.
+ */
+export async function compressToTargetSize(
+  img: HTMLImageElement,
+  targetBytes: number,
+  preferredFormat: 'image/jpeg' | 'image/webp' = 'image/webp',
+  initialWidth?: number,
+  initialHeight?: number
+): Promise<{ blob: Blob; finalWidth: number; finalHeight: number; quality: number }> {
+  let width = initialWidth || img.naturalWidth;
+  let height = initialHeight || img.naturalHeight;
+  let bestBlob: Blob | null = null;
+  let bestQuality = 0.85;
+
+  // Try up to 4 scale passes if image is large
+  for (let pass = 0; pass < 4; pass++) {
+    let low = 0.15;
+    let high = 0.95;
+
+    for (let iter = 0; iter < 5; iter++) {
+      const q = (low + high) / 2;
+      const blob = await processImage(img, {
+        width,
+        height,
+        format: preferredFormat,
+        quality: q,
+      });
+
+      if (blob.size <= targetBytes) {
+        bestBlob = blob;
+        bestQuality = q;
+        low = q + 0.05; // Try slightly higher quality to maximize sharpness
+      } else {
+        high = q - 0.05; // Exceeded target, reduce quality
+      }
+    }
+
+    if (bestBlob && bestBlob.size <= targetBytes) {
+      return {
+        blob: bestBlob,
+        finalWidth: width,
+        finalHeight: height,
+        quality: Math.round(bestQuality * 100),
+      };
+    }
+
+    // If still over target even at lowest quality, scale dimensions down by 25%
+    width = Math.max(120, Math.round(width * 0.75));
+    height = Math.max(120, Math.round(height * 0.75));
+  }
+
+  // Fallback: return smallest achieved
+  const finalBlob = bestBlob || (await processImage(img, {
+    width,
+    height,
+    format: preferredFormat,
+    quality: 0.15,
+  }));
+
+  return {
+    blob: finalBlob,
+    finalWidth: width,
+    finalHeight: height,
+    quality: Math.round(bestQuality * 100),
+  };
+}
+
+/**
  * Create and download a ZIP file containing multiple processed items
  */
 export async function downloadZip(

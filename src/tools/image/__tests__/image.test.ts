@@ -36,4 +36,14 @@ describe('Image & ZIP Utilities', () => {
     const customHeight = Math.round(customWidth / ratio);
     expect(customHeight).toBe(450);
   });
+
+  it('should correctly calculate target byte sizes for KB and MB', () => {
+    const calculateTargetBytes = (val: number, unit: 'KB' | 'MB') =>
+      unit === 'MB' ? Math.round(val * 1024 * 1024) : Math.round(val * 1024);
+
+    expect(calculateTargetBytes(500, 'KB')).toBe(512000);
+    expect(calculateTargetBytes(1, 'MB')).toBe(1048576);
+    expect(calculateTargetBytes(2.5, 'MB')).toBe(2621440);
+    expect(calculateTargetBytes(100, 'KB')).toBe(102400);
+  });
 });

@@ -12,9 +12,15 @@ import {
   AlertCircle,
   Loader2,
   Plus,
+  HardDrive,
 } from 'lucide-react';
 import { FileDropzone } from '../../components/shared/FileDropzone';
-import { loadImageFromFile, processImage, downloadZip } from '../../lib/imageUtils';
+import {
+  loadImageFromFile,
+  processImage,
+  compressToTargetSize,
+  downloadZip,
+} from '../../lib/imageUtils';
 import { downloadFile, formatBytes } from '../../lib/pdfUtils';
 
 interface ImageItem {
@@ -29,22 +35,37 @@ interface ImageItem {
   processedBlob?: Blob;
 }
 
-type ResizeMode = 'percentage' | 'dimensions';
+type ResizeMode = 'percentage' | 'dimensions' | 'file-size';
 type TargetFormat = 'original' | 'image/jpeg' | 'image/png' | 'image/webp';
+type SizeUnit = 'KB' | 'MB';
 
 export default function ResizeImage() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [resizeMode, setResizeMode] = useState<ResizeMode>('percentage');
+
+  // Percentage mode states
   const [percentage, setPercentage] = useState<number>(50);
+
+  // Exact dimensions mode states
   const [customWidth, setCustomWidth] = useState<number>(800);
   const [customHeight, setCustomHeight] = useState<number>(600);
   const [lockAspectRatio, setLockAspectRatio] = useState<boolean>(true);
+
+  // Target file size mode states
+  const [targetSizeValue, setTargetSizeValue] = useState<number>(500);
+  const [targetSizeUnit, setTargetSizeUnit] = useState<SizeUnit>('KB');
+
+  // Quality & Format states
   const [quality, setQuality] = useState<number>(85); // 10 to 100
   const [targetFormat, setTargetFormat] = useState<TargetFormat>('original');
 
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+
+  const calculateTargetBytes = (val = targetSizeValue, unit = targetSizeUnit): number => {
+    return unit === 'MB' ? Math.round(val * 1024 * 1024) : Math.round(val * 1024);
+  };
 
   const calculateDimensions = (
     origWidth: number,
@@ -61,7 +82,7 @@ export default function ResizeImage() {
         newWidth: Math.max(1, Math.round(origWidth * factor)),
         newHeight: Math.max(1, Math.round(origHeight * factor)),
       };
-    } else {
+    } else if (mode === 'dimensions') {
       if (keepRatio) {
         const ratio = origWidth / origHeight;
         if (cWidth && !cHeight) {
@@ -73,6 +94,9 @@ export default function ResizeImage() {
         };
       }
       return { newWidth: cWidth, newHeight: cHeight };
+    } else {
+      // File-size mode preserves original aspect unless compressed
+      return { newWidth: origWidth, newHeight: origHeight };
     }
   };
 
@@ -105,7 +129,6 @@ export default function ResizeImage() {
         });
 
         if (images.length === 0 && newItems.length === 1) {
-          // Preset initial dimension inputs to first image's size if unset
           setCustomWidth(Math.round(img.naturalWidth * 0.5));
           setCustomHeight(Math.round(img.naturalHeight * 0.5));
         }
@@ -186,8 +209,28 @@ export default function ResizeImage() {
 
   const processSingleItem = async (item: ImageItem): Promise<{ name: string; blob: Blob }> => {
     const img = await loadImageFromFile(item.file);
-    let format: 'image/jpeg' | 'image/png' | 'image/webp';
+    const baseName = item.file.name.replace(/\.[^/.]+$/, '');
 
+    // Target file size mode: iterative quality & scale search
+    if (resizeMode === 'file-size') {
+      const targetBytes = calculateTargetBytes();
+      const preferredFormat = targetFormat === 'image/jpeg' ? 'image/jpeg' : 'image/webp';
+      const ext = preferredFormat === 'image/jpeg' ? 'jpg' : 'webp';
+
+      const result = await compressToTargetSize(
+        img,
+        targetBytes,
+        preferredFormat,
+        item.origWidth,
+        item.origHeight
+      );
+
+      const outputFileName = `${baseName}-under-${targetSizeValue}${targetSizeUnit}.${ext}`;
+      return { name: outputFileName, blob: result.blob };
+    }
+
+    // Percentage or Dimensions mode
+    let format: 'image/jpeg' | 'image/png' | 'image/webp';
     if (targetFormat === 'original') {
       if (item.file.type === 'image/jpeg' || item.file.type === 'image/jpg') {
         format = 'image/jpeg';
@@ -208,7 +251,6 @@ export default function ResizeImage() {
     });
 
     const ext = format === 'image/jpeg' ? 'jpg' : format === 'image/webp' ? 'webp' : 'png';
-    const baseName = item.file.name.replace(/\.[^/.]+$/, '');
     const outputFileName = `${baseName}-${item.newWidth}x${item.newHeight}.${ext}`;
 
     return { name: outputFileName, blob };
@@ -267,7 +309,7 @@ export default function ResizeImage() {
       {success && (
         <div className="flex items-center gap-2 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm">
           <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <span>Successfully resized and downloaded your images!</span>
+          <span>Successfully processed and downloaded your images!</span>
         </div>
       )}
 
@@ -276,7 +318,7 @@ export default function ResizeImage() {
           onFilesSelected={handleFilesSelected}
           accept="image/*"
           multiple={true}
-          title="Drag & drop images to resize and compress"
+          title="Drag & drop images to resize, compress & reduce file size"
           subtitle="Supports PNG, JPG, JPEG, and WebP. 100% in-browser processing."
         />
       ) : (
@@ -338,23 +380,23 @@ export default function ResizeImage() {
             {/* Mode Selection */}
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Resize Mode
+                Resize & Compress Mode
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
                   onClick={() => {
                     setResizeMode('percentage');
                     updateCalculations('percentage', percentage, customWidth, customHeight, lockAspectRatio);
                   }}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
                     resizeMode === 'percentage'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted/60 text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   <Percent className="h-3.5 w-3.5" />
-                  <span>Percentage</span>
+                  <span>Percent</span>
                 </button>
 
                 <button
@@ -363,19 +405,35 @@ export default function ResizeImage() {
                     setResizeMode('dimensions');
                     updateCalculations('dimensions', percentage, customWidth, customHeight, lockAspectRatio);
                   }}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
                     resizeMode === 'dimensions'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted/60 text-muted-foreground hover:bg-muted'
                   }`}
                 >
                   <Scaling className="h-3.5 w-3.5" />
-                  <span>Exact (px)</span>
+                  <span>Dimensions</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResizeMode('file-size');
+                    updateCalculations('file-size', percentage, customWidth, customHeight, lockAspectRatio);
+                  }}
+                  className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                    resizeMode === 'file-size'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  <HardDrive className="h-3.5 w-3.5" />
+                  <span>Target Size</span>
                 </button>
               </div>
 
               {/* Mode Specific Controls */}
-              {resizeMode === 'percentage' ? (
+              {resizeMode === 'percentage' && (
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Scale Factor</span>
@@ -407,7 +465,9 @@ export default function ResizeImage() {
                     ))}
                   </div>
                 </div>
-              ) : (
+              )}
+
+              {resizeMode === 'dimensions' && (
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
@@ -451,6 +511,75 @@ export default function ResizeImage() {
                   </div>
                 </div>
               )}
+
+              {resizeMode === 'file-size' && (
+                <div className="space-y-2 pt-1">
+                  <label className="text-[10px] text-muted-foreground uppercase font-bold block">
+                    Target Max File Size
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      step={targetSizeUnit === 'MB' ? '0.1' : '10'}
+                      value={targetSizeValue}
+                      onChange={e => setTargetSizeValue(Math.max(1, Number(e.target.value)))}
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-mono font-bold"
+                    />
+
+                    <div className="grid grid-cols-2 gap-1 bg-muted/60 p-1 rounded-lg border border-border/60">
+                      {(['KB', 'MB'] as SizeUnit[]).map(u => (
+                        <button
+                          key={u}
+                          type="button"
+                          onClick={() => {
+                            if (u === 'MB' && targetSizeUnit === 'KB') {
+                              setTargetSizeValue(Number((targetSizeValue / 1024).toFixed(1)) || 1);
+                            } else if (u === 'KB' && targetSizeUnit === 'MB') {
+                              setTargetSizeValue(Math.round(targetSizeValue * 1024) || 500);
+                            }
+                            setTargetSizeUnit(u);
+                          }}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors ${
+                            targetSizeUnit === u
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preset Pills */}
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {[
+                      { val: 100, unit: 'KB' },
+                      { val: 250, unit: 'KB' },
+                      { val: 500, unit: 'KB' },
+                      { val: 1, unit: 'MB' },
+                      { val: 2, unit: 'MB' },
+                    ].map(preset => (
+                      <button
+                        key={`${preset.val}-${preset.unit}`}
+                        type="button"
+                        onClick={() => {
+                          setTargetSizeValue(preset.val);
+                          setTargetSizeUnit(preset.unit as SizeUnit);
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded border font-medium transition-colors ${
+                          targetSizeValue === preset.val && targetSizeUnit === preset.unit
+                            ? 'bg-primary/10 border-primary text-primary'
+                            : 'border-border text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {preset.val} {preset.unit}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Quality / Compression Slider */}
@@ -460,24 +589,37 @@ export default function ResizeImage() {
                 <span>Quality & Compression</span>
               </label>
 
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Output Quality</span>
-                  <span className="font-bold text-foreground">{quality}%</span>
+              {resizeMode === 'file-size' ? (
+                <div className="p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground leading-relaxed space-y-1.5">
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Auto-Optimized Quality</span>
+                  </div>
+                  <p className="text-[11px]">
+                    Quality and scale will automatically be tuned via binary search to ensure file size stays under{' '}
+                    <strong className="text-foreground">{targetSizeValue} {targetSizeUnit}</strong>.
+                  </p>
                 </div>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  step="5"
-                  value={quality}
-                  onChange={e => setQuality(Number(e.target.value))}
-                  className="w-full accent-primary"
-                />
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Higher quality increases visual sharpness and file size. 80-85% is ideal for web usage.
-                </p>
-              </div>
+              ) : (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Output Quality</span>
+                    <span className="font-bold text-foreground">{quality}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="20"
+                    max="100"
+                    step="5"
+                    value={quality}
+                    onChange={e => setQuality(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Higher quality increases visual sharpness and file size. 80-85% is ideal for web usage.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Output Format Selector */}
@@ -487,17 +629,19 @@ export default function ResizeImage() {
               </label>
               <div className="grid grid-cols-2 gap-1.5">
                 {[
-                  { id: 'original', label: 'Original' },
-                  { id: 'image/jpeg', label: 'JPG' },
-                  { id: 'image/png', label: 'PNG' },
-                  { id: 'image/webp', label: 'WebP' },
+                  { id: 'original', label: 'Original', disabled: resizeMode === 'file-size' },
+                  { id: 'image/webp', label: 'WebP (Best)', disabled: false },
+                  { id: 'image/jpeg', label: 'JPG', disabled: false },
+                  { id: 'image/png', label: 'PNG', disabled: resizeMode === 'file-size' },
                 ].map(fmt => (
                   <button
                     key={fmt.id}
                     type="button"
+                    disabled={fmt.disabled}
                     onClick={() => setTargetFormat(fmt.id as TargetFormat)}
-                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold transition-colors ${
-                      targetFormat === fmt.id
+                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold transition-colors disabled:opacity-30 ${
+                      (targetFormat === fmt.id && (!fmt.disabled || resizeMode !== 'file-size')) ||
+                      (resizeMode === 'file-size' && targetFormat === 'original' && fmt.id === 'image/webp')
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`}
@@ -506,6 +650,11 @@ export default function ResizeImage() {
                   </button>
                 ))}
               </div>
+              {resizeMode === 'file-size' && (
+                <p className="text-[10px] text-muted-foreground">
+                  Target size compression utilizes WebP or JPG for high compression efficiency.
+                </p>
+              )}
             </div>
           </div>
 
@@ -532,9 +681,15 @@ export default function ResizeImage() {
                       <div>
                         Original: {item.origWidth}×{item.origHeight}px ({formatBytes(item.origSize)})
                       </div>
-                      <div className="text-primary font-bold">
-                        Target: {item.newWidth}×{item.newHeight}px
-                      </div>
+                      {resizeMode === 'file-size' ? (
+                        <div className="text-primary font-bold">
+                          Target: ≤ {targetSizeValue} {targetSizeUnit}
+                        </div>
+                      ) : (
+                        <div className="text-primary font-bold">
+                          Target: {item.newWidth}×{item.newHeight}px
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
