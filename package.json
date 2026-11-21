@@ -2,7 +2,7 @@
   "name": "webtools",
   "private": true,
   "version": "0.1.0",
-  "homepage": "https://github.com/thequiteflare/webtools",
+  "homepage": "https://thewebtools.vercel.app",
   "repository": {
     "type": "git",
     "url": "https://github.com/thequiteflare/webtools.git"

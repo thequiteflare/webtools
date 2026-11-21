@@ -32,7 +32,7 @@ export default function QrGenerator() {
   const [inputType, setInputType] = useState<InputType>('url');
 
   // Input states
-  const [urlValue, setUrlValue] = useState('https://webtools.dev');
+  const [urlValue, setUrlValue] = useState('https://thewebtools.vercel.app');
   const [textValue, setTextValue] = useState('');
   const [wifiSsid, setWifiSsid] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
@@ -61,7 +61,7 @@ export default function QrGenerator() {
   const getPayload = (): string => {
     switch (inputType) {
       case 'url':
-        return urlValue.trim() || 'https://webtools.dev';
+        return urlValue.trim() || 'https://thewebtools.vercel.app';
       case 'text':
         return textValue || 'Hello from Webtools!';
       case 'wifi': {
