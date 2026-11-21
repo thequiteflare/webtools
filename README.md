@@ -62,7 +62,7 @@ Every day, millions of people need to sign PDFs, merge documents, delete pages, 
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/webtools.git
+git clone https://github.com/thequiteflare/webtools.git
 cd webtools
 
 # Install dependencies
