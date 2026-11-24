@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import QRCodeStyling, {
   type DotType,
   type CornerSquareType,
@@ -16,9 +16,32 @@ import {
   Palette,
   RotateCcw,
   Sparkles,
+  Check,
 } from 'lucide-react';
+import { parseQrPayload } from '../../lib/qrUtils';
 
 type InputType = 'url' | 'text' | 'wifi' | 'email' | 'phone';
+
+function getInitialImport(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = sessionStorage.getItem('webtools_qr_import');
+    if (stored) {
+      sessionStorage.removeItem('webtools_qr_import');
+      return stored;
+    }
+    const hash = window.location.hash;
+    if (hash.includes('?')) {
+      const queryString = hash.split('?')[1];
+      const params = new URLSearchParams(queryString);
+      const dataParam = params.get('data') || params.get('text');
+      if (dataParam) return decodeURIComponent(dataParam);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
 
 const COLOR_PRESETS = [
   { name: 'Midnight', dots: '#0f172a', bg: '#ffffff', corners: '#0f172a' },
@@ -29,19 +52,132 @@ const COLOR_PRESETS = [
 ];
 
 export default function QrGenerator() {
-  const [inputType, setInputType] = useState<InputType>('url');
+  const [initialImportData] = useState<string | null>(() => getInitialImport());
+  const initialParsed = initialImportData ? parseQrPayload(initialImportData) : null;
+
+  const [inputType, setInputType] = useState<InputType>(() => {
+    if (!initialParsed) return 'url';
+    if (initialParsed.type === 'url') return 'url';
+    if (initialParsed.type === 'wifi') return 'wifi';
+    if (initialParsed.type === 'email') return 'email';
+    if (initialParsed.type === 'phone') return 'phone';
+    return 'text';
+  });
 
   // Input states
-  const [urlValue, setUrlValue] = useState('https://thewebtools.vercel.app');
-  const [textValue, setTextValue] = useState('');
-  const [wifiSsid, setWifiSsid] = useState('');
-  const [wifiPassword, setWifiPassword] = useState('');
-  const [wifiEncryption, setWifiEncryption] = useState<'WPA' | 'WEP' | 'nopass'>('WPA');
-  const [wifiHidden, setWifiHidden] = useState(false);
-  const [emailTo, setEmailTo] = useState('');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [urlValue, setUrlValue] = useState<string>(() => {
+    if (initialParsed?.type === 'url') return initialParsed.url || initialImportData || '';
+    return 'https://thewebtools.vercel.app';
+  });
+  const [textValue, setTextValue] = useState<string>(() => {
+    if (
+      initialParsed &&
+      initialParsed.type !== 'url' &&
+      initialParsed.type !== 'wifi' &&
+      initialParsed.type !== 'email' &&
+      initialParsed.type !== 'phone'
+    ) {
+      return initialImportData || '';
+    }
+    return '';
+  });
+  const [wifiSsid, setWifiSsid] = useState<string>(() => initialParsed?.wifi?.ssid || '');
+  const [wifiPassword, setWifiPassword] = useState<string>(() => initialParsed?.wifi?.password || '');
+  const [wifiEncryption, setWifiEncryption] = useState<'WPA' | 'WEP' | 'nopass'>(() => {
+    const enc = (initialParsed?.wifi?.encryption || '').toUpperCase();
+    if (enc === 'WEP' || enc === 'WPA' || enc === 'NOPASS') return enc as any;
+    return 'WPA';
+  });
+  const [wifiHidden, setWifiHidden] = useState<boolean>(() => Boolean(initialParsed?.wifi?.hidden));
+  const [emailTo, setEmailTo] = useState<string>(() => initialParsed?.email?.to || '');
+  const [emailSubject, setEmailSubject] = useState<string>(() => initialParsed?.email?.subject || '');
+  const [emailBody, setEmailBody] = useState<string>(() => initialParsed?.email?.body || '');
+  const [phoneNumber, setPhoneNumber] = useState<string>(() => initialParsed?.phone?.number || '');
+
+  const [importNotification, setImportNotification] = useState<string | null>(() =>
+    initialImportData ? 'Loaded decoded QR code data' : null
+  );
+
+  const applyQrData = useCallback((raw: string) => {
+    if (!raw) return;
+    const parsed = parseQrPayload(raw);
+    if (parsed.type === 'url') {
+      setInputType('url');
+      setUrlValue(parsed.url || raw);
+    } else if (parsed.type === 'wifi') {
+      setInputType('wifi');
+      setWifiSsid(parsed.wifi?.ssid || '');
+      setWifiPassword(parsed.wifi?.password || '');
+      const enc = (parsed.wifi?.encryption || '').toUpperCase();
+      if (enc === 'WEP' || enc === 'WPA' || enc === 'NOPASS') {
+        setWifiEncryption(enc as any);
+      } else {
+        setWifiEncryption('WPA');
+      }
+      setWifiHidden(Boolean(parsed.wifi?.hidden));
+    } else if (parsed.type === 'email') {
+      setInputType('email');
+      setEmailTo(parsed.email?.to || '');
+      setEmailSubject(parsed.email?.subject || '');
+      setEmailBody(parsed.email?.body || '');
+    } else if (parsed.type === 'phone') {
+      setInputType('phone');
+      setPhoneNumber(parsed.phone?.number || '');
+    } else {
+      setInputType('text');
+      setTextValue(raw);
+    }
+    setImportNotification('Loaded decoded QR code data');
+  }, []);
+
+  useEffect(() => {
+    const checkImport = () => {
+      try {
+        const stored = sessionStorage.getItem('webtools_qr_import');
+        if (stored) {
+          sessionStorage.removeItem('webtools_qr_import');
+          applyQrData(stored);
+          return;
+        }
+
+        const hash = window.location.hash;
+        if (hash.includes('?')) {
+          const queryString = hash.split('?')[1];
+          const params = new URLSearchParams(queryString);
+          const dataParam = params.get('data') || params.get('text');
+          if (dataParam) {
+            applyQrData(decodeURIComponent(dataParam));
+          }
+        }
+      } catch (err) {
+        console.error('Error importing QR data:', err);
+      }
+    };
+
+    const handleCustomImport = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        applyQrData(customEvent.detail);
+      } else {
+        checkImport();
+      }
+    };
+
+    window.addEventListener('hashchange', checkImport);
+    window.addEventListener('webtools_qr_import', handleCustomImport);
+
+    return () => {
+      window.removeEventListener('hashchange', checkImport);
+      window.removeEventListener('webtools_qr_import', handleCustomImport);
+    };
+  }, [applyQrData]);
+
+  useEffect(() => {
+    if (importNotification) {
+      const timer = setTimeout(() => setImportNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [importNotification]);
 
   // Styling states
   const [dotType, setDotType] = useState<DotType>('rounded');
@@ -173,6 +309,22 @@ export default function QrGenerator() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Input Form & Styling Controls (7 cols) */}
         <div className="lg:col-span-7 space-y-5">
+          {importNotification && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 shrink-0" />
+                <span>{importNotification}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setImportNotification(null)}
+                className="hover:opacity-70 px-1 py-0.5 rounded text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* Content Type Selector */}
           <div className="p-4 rounded-2xl border border-border/80 bg-card space-y-4">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">

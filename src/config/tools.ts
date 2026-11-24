@@ -22,8 +22,8 @@ export const CATEGORIES: CategoryInfo[] = [
   },
   {
     id: 'generator',
-    name: 'Generators',
-    description: 'Generate high-resolution styled QR codes and identifiers.',
+    name: 'QR & Generators',
+    description: 'Generate, customize, and decode QR codes and identifiers.',
     iconName: 'QrCode',
   },
 ];
@@ -124,5 +124,15 @@ export const TOOLS: ToolDefinition[] = [
     keywords: ['qr', 'qrcode', 'barcode', 'generator', 'link', 'logo', 'svg'],
     badge: 'popular',
     component: lazy(() => import('../tools/generator/QrGenerator')),
+  },
+  {
+    id: 'gen-qr-decode',
+    title: 'QR Code Decoder',
+    description: 'Decode and extract text, URLs, Wi-Fi credentials, and contact details from QR code images.',
+    category: 'generator',
+    iconName: 'ScanQrCode',
+    keywords: ['qr', 'qrcode', 'decode', 'reader', 'scanner', 'read', 'scan', 'image', 'extract', 'barcode', 'wifi'],
+    badge: 'new',
+    component: lazy(() => import('../tools/generator/QrDecoder')),
   },
 ];

@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   Menu,
   X,
+  Download,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -15,6 +16,8 @@ interface HeaderProps {
   onToggleTheme: () => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  isInstallable?: boolean;
+  onInstall?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,6 +27,8 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   isSidebarOpen,
   onToggleSidebar,
+  isInstallable,
+  onInstall,
 }) => {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/80 backdrop-blur-md">
@@ -75,6 +80,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          {isInstallable && onInstall && (
+            <button
+              onClick={onInstall}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold border border-primary/20 transition-all active:scale-95 shadow-sm"
+              title="Install Webtools as an app"
+              aria-label="Install App"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Install</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenCommand}
             className="sm:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
