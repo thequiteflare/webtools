@@ -13,6 +13,7 @@ import {
   Binary,
   FileCode,
   Hash,
+  ScanQrCode,
   HelpCircle,
   type LucideProps,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ const ICONS: Record<string, ComponentType<LucideProps>> = {
   Binary,
   FileCode,
   Hash,
+  ScanQrCode,
 };
 
 interface IconRendererProps extends LucideProps {

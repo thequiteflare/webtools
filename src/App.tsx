@@ -18,7 +18,8 @@ export function App() {
   >("all");
   const [selectedToolId, setSelectedToolId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      const hash = window.location.hash.replace("#", "");
+      const rawHash = window.location.hash.replace("#", "");
+      const hash = rawHash.split("?")[0];
       return hash && TOOLS.some((t) => t.id === hash) ? hash : null;
     }
     return null;
@@ -29,7 +30,8 @@ export function App() {
   // Sync with browser URL hash
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace("#", "");
+      const rawHash = window.location.hash.replace("#", "");
+      const hash = rawHash.split("?")[0];
       if (hash && TOOLS.some((t) => t.id === hash)) {
         setSelectedToolId(hash);
       } else {
