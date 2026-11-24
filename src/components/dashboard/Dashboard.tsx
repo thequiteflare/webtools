@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, ShieldCheck, Zap, Lock, Sparkles, ArrowUpRight } from 'lucide-react';
+import { Search, ShieldCheck, Zap, Lock, Sparkles, ArrowUpRight, Download } from 'lucide-react';
 import { TOOLS, CATEGORIES } from '../../config/tools';
 import { IconRenderer } from '../shared/IconRenderer';
 import type { ToolCategory, ToolDefinition } from '../../types/tool';
@@ -8,12 +8,16 @@ interface DashboardProps {
   selectedCategory: ToolCategory | 'all';
   onSelectCategory: (cat: ToolCategory | 'all') => void;
   onSelectTool: (id: string) => void;
+  isInstallable?: boolean;
+  onInstall?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   selectedCategory,
   onSelectCategory,
   onSelectTool,
+  isInstallable,
+  onInstall,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -58,10 +62,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Zap className="h-4 w-4 text-amber-500 shrink-0" />
               <span>Instant client execution</span>
             </div>
-            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-background/60 border border-border/50 text-foreground/80">
-              <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
-              <span>Works offline (PWA)</span>
-            </div>
+            {isInstallable && onInstall ? (
+              <button
+                onClick={onInstall}
+                className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary transition-all text-left group cursor-pointer"
+                title="Click to install Webtools app"
+              >
+                <div className="flex items-center gap-2">
+                  <Download className="h-4 w-4 text-primary shrink-0 group-hover:translate-y-0.5 transition-transform" />
+                  <span className="font-semibold">Install App (PWA)</span>
+                </div>
+                <span className="text-[10px] bg-primary/20 px-1.5 py-0.5 rounded font-mono font-medium">Install</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-background/60 border border-border/50 text-foreground/80">
+                <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
+                <span>Works offline (PWA)</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -5,12 +5,14 @@ import { Dashboard } from "./components/dashboard/Dashboard";
 import { ToolViewer } from "./components/layout/ToolViewer";
 import { CommandMenu } from "./components/layout/CommandMenu";
 import { useTheme } from "./hooks/useTheme";
+import { usePWAInstall } from "./hooks/usePWAInstall";
 import { TOOLS } from "./config/tools";
 import { APP_VERSION } from "./config/version";
 import type { ToolCategory } from "./types/tool";
 
 export function App() {
   const { theme, toggleTheme } = useTheme();
+  const { isInstallable, promptInstall } = usePWAInstall();
   const [selectedCategory, setSelectedCategory] = useState<
     ToolCategory | "all"
   >("all");
@@ -75,6 +77,8 @@ export function App() {
         onToggleTheme={toggleTheme}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        isInstallable={isInstallable}
+        onInstall={promptInstall}
       />
 
       {/* Main Body */}
@@ -102,6 +106,8 @@ export function App() {
               selectedCategory={selectedCategory}
               onSelectCategory={setSelectedCategory}
               onSelectTool={handleSelectTool}
+              isInstallable={isInstallable}
+              onInstall={promptInstall}
             />
           )}
         </main>
